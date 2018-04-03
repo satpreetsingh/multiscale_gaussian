@@ -13,7 +13,7 @@ layers=2; %Number of layers used in model
 K=2; %Number of children each parent node has
 mu_prior=[0;0];
 Sigma_prior=3*eye(2);
-
+Q=0.1*eye(2);
 %Calculate number of gaussians used in model
 num_of_nodes=0;
 for ii=1:layers
@@ -22,6 +22,7 @@ end
 
 % Create cell structure that will store pointers to nodes
 mu_nodes=cell(layers,1);
+cov_tree=cov_tree.set(1,Sigma_prior);
 start=2;
 for ii=1:layers
     fin=K^ii-1;
@@ -30,7 +31,7 @@ for ii=1:layers
 end
 
 
-sample_mu_tree=tree('root');
+sample_mu_tree=tree(mu_prior);
 for ii=1:layers
     mu_index=1;
     t_index=1;
@@ -45,7 +46,7 @@ for ii=1:layers
            m=sample_mu_tree.get(mu_nodes{ii-1}(mu_index));
            S=cov_tree.get(mu_nodes{ii}(j));
            c=cell(2,1);
-           c{1}=mvnrnd(m{1}',S);
+           c{1}=mvnrnd(m{1}',S)';
            [sample_mu_tree, ~]=sample_mu_tree.addnode(mu_nodes{ii-1}(mu_index),c);
            t_index=t_index+1;
            if t_index>K
@@ -56,9 +57,15 @@ for ii=1:layers
    end
 end
 clear t_index; clear mu_index;clear start; clear fin;clear m;clear S;clear c;
-disp(sample_mu_tree.tostring)
+% disp(sample_mu_tree.tostring)
 %Will run Metropolis-Hastings on the conditionals where the proposal is
 %constructed using Black Box VI 
 M=1000; %Number of samples accepted
 burnIn=1000; %Length of burn in period for markov chain
 
+N=num_of_nodes;
+Q=0.5*eye(2);
+max_iter=500;
+P=2;
+S=150;
+[alpha,R]=stochastic_VI_mu(sample_mu_tree,cov_tree,ld_tree,x,P,N,S,Q,max_iter);
