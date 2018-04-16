@@ -19,9 +19,7 @@ from torch import FloatTensor
 from torch.autograd import Variable
 import numpy as np
 import scipy.io as sio
-import gradients_phase1 as grad
-from joblib import Parallel, delayed
-import multiprocessing
+import gradients as grad
 import pickle
 
 #Load in synthetic states from matlab 
