@@ -1,14 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Apr 16 01:32:07 2018
-
-@author: user
-"""
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
 Created on Sun Apr 15 01:02:27 2018
 
 @author: Josue Nassar
@@ -22,8 +14,8 @@ import scipy.io as sio
 import gradients as grad
 import pickle
 
-#Load in synthetic states from matlab 
-mat_contents=sio.loadmat('synthetic_states.mat') 
+#Load in synthetic states from matlab
+mat_contents=sio.loadmat('synthetic_states.mat')
 states=np.matrix(mat_contents['x'])
 T=states[1,:].size #Number of data points
 dim=states[:,1].size #Dimension of latent state
@@ -56,7 +48,7 @@ beta2=0.999
 mu_prior=np.matrix(np.zeros(dim)).T
 Cov_prior=np.matrix(10*np.eye(dim))
 
-NumParents=2 #Number of parents 
+NumParents=2 #Number of parents
 NumKids=4 #Number of kids. Each parents has 2 kids
 
 #Inital estimate of location and scale parameter of variational distribution of parents
@@ -84,7 +76,7 @@ v_alpha=np.zeros((2,6))
 v_sigma=np.zeros(6)
 
 iter=0
-while iter<max_iter:
+while iter<max_iter: # TODO: write this as a for loop! (you can break)
     iter+=1
     print(iter)
     #Draw M samples from N(0,I)
@@ -302,15 +294,3 @@ while iter<max_iter:
 
 with open('objs.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
     pickle.dump([alpha_est,sigma_est], f)
-            
-            
-            
-    
-        
-
-
-
-
-
-
-
