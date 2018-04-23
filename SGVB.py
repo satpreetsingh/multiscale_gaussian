@@ -120,16 +120,16 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
         e5=np.matrix(e[:,m,5]).T
         
         #Compute gradients from prior
-        gp1,sp1,gk1,sk1,gk2,sk2=grad.prior_gradient(alpha0,sigma0,e0,alpha2,sigma2,e2,alpha3,sigma3,e3,mu_prior,Cov_prior)
-        gp2,sp2,gk3,sk3,gk4,sk4=grad.prior_gradient(alpha1,sigma1,e1,alpha4,sigma4,e4,alpha5,sigma5,e5,mu_prior,Cov_prior)
+        gp1,sp1,gk1,sk1,gk2,sk2=grad.prior_gradient_mu(alpha0,sigma0,e0,alpha2,sigma2,e2,alpha3,sigma3,e3,mu_prior,Cov_prior)
+        gp2,sp2,gk3,sk3,gk4,sk4=grad.prior_gradient_mu(alpha1,sigma1,e1,alpha4,sigma4,e4,alpha5,sigma5,e5,mu_prior,Cov_prior)
         
         #Compute gradients from variational distribution
-        var_a_p1,var_s_p1=grad.variational_gradient(alpha0,sigma0,e0)
-        var_a_p2,var_s_p2=grad.variational_gradient(alpha1,sigma1,e1)
-        var_a_k1,var_s_k1=grad.variational_gradient(alpha2,sigma2,e2)
-        var_a_k2,var_s_k2=grad.variational_gradient(alpha3,sigma3,e3)
-        var_a_k3,var_s_k3=grad.variational_gradient(alpha4,sigma4,e4)
-        var_a_k4,var_s_k4=grad.variational_gradient(alpha5,sigma5,e5)
+        var_a_p1,var_s_p1=grad.variational_gradient_mu(alpha0,sigma0,e0)
+        var_a_p2,var_s_p2=grad.variational_gradient_mu(alpha1,sigma1,e1)
+        var_a_k1,var_s_k1=grad.variational_gradient_mu(alpha2,sigma2,e2)
+        var_a_k2,var_s_k2=grad.variational_gradient_mu(alpha3,sigma3,e3)
+        var_a_k3,var_s_k3=grad.variational_gradient_mu(alpha4,sigma4,e4)
+        var_a_k4,var_s_k4=grad.variational_gradient_mu(alpha5,sigma5,e5)
         
         like_a0=0
         like_a1=0
