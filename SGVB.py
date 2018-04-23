@@ -44,7 +44,7 @@ true_mu=true_mu.ravel()
 true_mu=true_mu.reshape(2,6)
 Q=np.matrix(0.5*np.eye(dim))
 
-M=30 #Number of samples drawn from N(0,I) at each iteration
+M=75 #Number of samples drawn from N(0,I) at each iteration
 max_iter=1 #Maximum number of iterations SGVB will run for 
 
 #Parameters of ADAM
@@ -270,6 +270,7 @@ while iter<max_iter:
 #####################################################################  
       
     gradient_alpha=np.matrix(np.asarray(gradient_alpha)).T
+    print(gradient_alpha)
     gradient_s=np.matrix(np.asarray(gradient_s))
     
     m_alpha=beta1*m_alpha+(1-beta1)*gradient_alpha
@@ -294,7 +295,7 @@ while iter<max_iter:
     for n in range(0,6):
         diff=alpha_est[:,n]-alpha_past[:,n]
         dist=np.sqrt(diff.T*diff)
-        if dist<=a:
+        if dist<=0.1:
             count+=1
     
     if count==6:
@@ -302,6 +303,7 @@ while iter<max_iter:
 
 with open('objs.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
     pickle.dump([alpha_est,sigma_est], f)
+f.close()
             
             
             

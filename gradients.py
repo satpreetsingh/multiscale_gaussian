@@ -11,26 +11,41 @@ from torch import FloatTensor
 from torch.autograd import Variable
 import numpy as np
 
-def variational_gradient(alpha_est,R_est,samp):
-    a=Variable(torch.from_numpy(alpha_est).float(),requires_grad=True)
-    a.retain_grad()
-    R=Variable(torch.from_numpy(R_est).float(),requires_grad=True)
-    R.retain_grad()
+def variational_gradient_mu(alpha_est,phi_est,samp,dim):
+    alpha=Variable(torch.from_numpy(alpha_est).float(),requires_grad=True)
+    alpha.retain_grad()
+    phi=Variable(torch.from_numpy(phi_est).float(),requires_grad=True)
+    phi.retain_grad()
     e=Variable(torch.from_numpy(samp).float())
     
-    w1=(a+R*e-a)
+    w1=(alpha+phi*e-alpha)
     
     w2=w1.transpose(0,1)
-    w3=R*R
+    w3=phi*phi
     arg=torch.matmul(w2,w1)
     arg_3=arg/w3
     arg_2=-0.5*arg_3
-    arg_1=-torch.log(2*np.pi*R*R)
+    arg_1=-dim*0.5*torch.log(2*np.pi*phi*phi)
     L=arg_1-arg_2
     L.backward()
-    return a.grad.data, R.grad.data
+    return alpha.grad.data, phi.grad.data
 
-def prior_gradient(alpha_p,R_p,es_p,alpha_k1,R_k1,es_k1,alpha_k2,R_k2,es_k2,mu_prior,Cov_prior):
+def variational_gradient_cov(beta_est,theta_est,samp):
+    beta=Variable(torch.from_numpy(beta_est).float(),requires_grad=True)
+    beta.retain_grad()
+    theta=Variable(torch.from_numpy(theta_est).float(),requires_grad=True)
+    theta.retain_grad()
+    z=Variable(torch.from_numpy(samp).float())
+    
+    w1=torch.log(theta)
+    w2=torch.sqrt(theta)*z
+    L=-beta-w2-0.5*w1
+    L.backward()
+    return beta.grad.data,theta.grad.data
+
+    
+
+def prior_gradient_mu(alpha_p,R_p,es_p,alpha_k1,R_k1,es_k1,alpha_k2,R_k2,es_k2,mu_prior,Cov_prior):
     a_p=Variable(torch.from_numpy(alpha_p).float(),requires_grad=True)
     a_p.retain_grad()
     s_p=Variable(torch.from_numpy(R_p).float(),requires_grad=True)
@@ -71,6 +86,7 @@ def prior_gradient(alpha_p,R_p,es_p,alpha_k1,R_k1,es_k1,alpha_k2,R_k2,es_k2,mu_p
     L=arg1+arg2+arg3
     L.backward()
     return a_p.grad.data,s_p.grad.data,a_k1.grad.data,s_k1.grad.data,a_k2.grad.data,s_k2.grad.data
+
 
 def like_gradient(alpha1,alpha2,alpha3,alpha4,alpha5,alpha6,sigma1,sigma2,sigma3,sigma4,sigma5,sigma6,ep1,ep2,ep3,ep4,ep5,ep6,x_t,u_t,y,Cov,theta,Q):
     a1=Variable(torch.from_numpy(alpha1).float(),requires_grad=True)
