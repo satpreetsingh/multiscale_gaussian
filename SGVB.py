@@ -37,10 +37,10 @@ true_mu=true_mu.reshape(2,6)
 Q=np.matrix(0.5*np.eye(dim))
 
 M=75 #Number of samples drawn from N(0,I) at each iteration
-max_iter=1 #Maximum number of iterations SGVB will run for 
+max_iter=400 #Maximum number of iterations SGVB will run for 
 
 #Parameters of ADAM
-a=0.2
+a=0.1
 beta1=0.9
 beta2=0.999
 
@@ -74,6 +74,13 @@ m_alpha=np.zeros((2,6))
 m_sigma=np.zeros(6)
 v_alpha=np.zeros((2,6))
 v_sigma=np.zeros(6)
+
+
+#Matrices used to store estimates of alpha and sigma
+all_alpha_est=np.zeros((2,6,max_iter+1))
+all_alpha_est[:,:,0]=alpha_est
+all_sigma_est=np.zeros((max_iter+1,6))
+all_sigma_est[1,:]=sigma_est
 
 iter=0
 while iter<max_iter: # TODO: write this as a for loop! (you can break)
@@ -283,6 +290,9 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
     print(sigma_est)
     print(alpha_est)
     
+    all_alpha_est[:,:,iter]=alpha_est
+    all_sigma_est[iter,:]=sigma_est
+    
     count=0
     for n in range(0,6):
         diff=alpha_est[:,n]-alpha_past[:,n]
@@ -296,3 +306,7 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
 with open('objs.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
     pickle.dump([alpha_est,sigma_est], f)
 f.close()
+
+np.save('alpha_est',all_alpha_est)
+np.save('sigma_est',all_sigma_est)
+
