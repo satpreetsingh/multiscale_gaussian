@@ -17,6 +17,7 @@ import pickle
 #Load in synthetic states from matlab
 mat_contents=sio.loadmat('synthetic_states.mat')
 states=np.matrix(mat_contents['x'])
+states=states[:,0:1000]
 T=states[1,:].size #Number of data points
 dim=states[:,1].size #Dimension of latent state
 
@@ -37,7 +38,7 @@ true_mu=true_mu.reshape(2,6)
 Q=np.matrix(0.5*np.eye(dim))
 
 M=75 #Number of samples drawn from N(0,I) at each iteration
-max_iter=400 #Maximum number of iterations SGVB will run for 
+max_iter=600 #Maximum number of iterations SGVB will run for 
 
 #Parameters of ADAM
 a=0.1
