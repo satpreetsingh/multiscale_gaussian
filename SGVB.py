@@ -4,6 +4,16 @@
 Created on Sun Apr 15 01:02:27 2018
 
 @author: Josue Nassar
+Running Stochastic Gradient Variational Bayes to test how accuratcely we can determine 
+the location of the posited gaussians. For the parents, they will follow 
+mu_p~N(alpha_p,s_p^2*I) (i.e. an isotropic gaussian) Will optimize alpha and s.
+To ensure non-negativity constraint, will project s onto the positive reals which corresponds
+to taking the absolute value i.e. s_t=abs(s_+eta*g)
+
+The kids will be conditioned on the parents
+mu_k|mu_p~N(mu_k+beta_p,s_k^2*I) where beta_p is an offset. projection will also 
+be done on s_k
+So we will learn alpha_p's and 
 """
 
 import torch
@@ -37,8 +47,8 @@ true_mu=true_mu.ravel()
 true_mu=true_mu.reshape(2,6)
 Q=np.matrix(0.5*np.eye(dim))
 
-M=75 #Number of samples drawn from N(0,I) at each iteration
-max_iter=600 #Maximum number of iterations SGVB will run for 
+M=1 #Number of samples drawn from N(0,I) at each iteration
+max_iter=1000 #Maximum number of iterations SGVB will run for 
 
 #Parameters of ADAM
 a=0.1
@@ -46,86 +56,62 @@ beta1=0.9
 beta2=0.999
 
 #Set up prior for parents
-mu_prior=np.matrix(np.zeros(dim)).T
-Cov_prior=np.matrix(10*np.eye(dim))
+mu_prior=np.zeros(dim)
+Cov_prior=10*np.eye(dim)
 
 NumParents=2 #Number of parents
-NumKids=4 #Number of kids. Each parents has 2 kids
+NumKids=4 #Number of kids
+PerParent=int(NumKids/NumParents) #Each parents will have equal number of children
+NumFam=int((NumParents+NumKids)/PerParent) #Number of families
+"""
+alpha and theta will follow this convention
+[P1, Kids of P1, P2 kids of P2, etc ]
+"""
+#Beta is also encoded in this array
+alpha_est=np.random.multivariate_normal(mu_prior,Cov_prior,NumParents).T
+beta_est=np.random.multivariate_normal(mu_prior,0.5*np.eye(dim),NumKids).T
+sigma_est=np.sqrt(4)*np.ones(NumParents+NumKids)
 
-#Inital estimate of location and scale parameter of variational distribution of parents
-alpha_est=[]
-alpha_est.append(np.random.multivariate_normal([0,0],Cov_prior,1).T)
-alpha_est.append(np.random.multivariate_normal([0,0],Cov_prior,1).T)
-alpha_est.append(np.random.multivariate_normal(alpha_est[0].ravel(),Cov_prior,1).T)
-alpha_est.append(np.random.multivariate_normal(alpha_est[0].ravel(),Cov_prior,1).T)
-alpha_est.append(np.random.multivariate_normal(alpha_est[1].ravel(),Cov_prior,1).T)
-alpha_est.append(np.random.multivariate_normal(alpha_est[1].ravel(),Cov_prior,1).T)
-alpha_est=np.matrix(np.asarray(alpha_est)).T
+#Create a matrix that holds families. 
+fam=np.zeros((dim,1+PerParent,NumFam))
+point=0
+for p in range(0,NumParents):
+    fam[:,0,p]=alpha_est[:,p]
+    fam[:,1:1+PerParent,p]=beta_est[:,point:point+PerParent]
+    point+=PerParent
 
-sigma_est=[]
-sigma_est.append(np.sqrt(5))
-sigma_est.append(np.sqrt(5))
-sigma_est.append(np.sqrt(2))
-sigma_est.append(np.sqrt(2))
-sigma_est.append(np.sqrt(2))
-sigma_est.append(np.sqrt(2))
-sigma_est=np.matrix(np.asarray(sigma_est))
+#ADAM parameters for alpha 
+m_alpha=np.zeros((dim,NumParents))
+v_alpha=np.zeros((dim,NumParents))
 
-m_alpha=np.zeros((2,6))
-m_sigma=np.zeros(6)
-v_alpha=np.zeros((2,6))
-v_sigma=np.zeros(6)
+#ADAM parameters for beta
+m_beta=np.zeros((dim,NumKids))
+v_beta=np.zeros((dim,NumKids))
 
+#ADAM parameters for sigma
+m_sigma=np.zeros((dim,NumParents+NumKids))
+v_sigma=np.zeros((dim,NumParents+NumKids))
 
-#Matrices used to store estimates of alpha and sigma
-all_alpha_est=np.zeros((2,6,max_iter+1))
-all_alpha_est[:,:,0]=alpha_est
-all_sigma_est=np.zeros((max_iter+1,6))
-all_sigma_est[1,:]=sigma_est
 
 iter=0
 while iter<max_iter: # TODO: write this as a for loop! (you can break)
     iter+=1
     print(iter)
     #Draw M samples from N(0,I)
-    e=np.random.randn(dim,M,6)
+    e_p=np.random.randn(dim,NumParents,M)#Samples for parents
+    e_k=np.random.randn(dim,NumKids,M) #Samples for kids
     
-    #Create list to store estimates of gradient of variational distribution wrt alpha and R
-    gradients_alpha1=[]
-    gradients_alpha2=[]
-    gradients_alpha3=[]
-    gradients_alpha4=[]
-    gradients_alpha5=[]
-    gradients_alpha6=[]
-    
-    gradients_s1=[]
-    gradients_s2=[]
-    gradients_s3=[]
-    gradients_s4=[]
-    gradients_s5=[]
-    gradients_s6=[]
+    #Initalize matrix to store gradients of alpha,beta, sigma
+    gradients_alpha=np.zeros((dim,NumParents,M))
+    gradients_beta=np.zeros((dim,NumKids,M))
+    gradients_sigma=np.zeros(NumParents+NumKids)
     
     for m in range(0,M):
-        alpha0=np.matrix(alpha_est[:,0])
-        alpha1=np.matrix(alpha_est[:,1])
-        alpha2=np.matrix(alpha_est[:,2])
-        alpha3=np.matrix(alpha_est[:,3])
-        alpha4=np.matrix(alpha_est[:,4])
-        alpha5=np.matrix(alpha_est[:,5])
         
-        sigma0=np.matrix(sigma_est[:,0])
-        sigma1=np.matrix(sigma_est[:,1])
-        sigma2=np.matrix(sigma_est[:,2])
-        sigma3=np.matrix(sigma_est[:,3])
-        sigma4=np.matrix(sigma_est[:,4])
-        sigma5=np.matrix(sigma_est[:,5])
+        #Compute gradients wrt to variational distribution
+        #(NOTE: Variational distribution gives gradient 0 for alpha and beta)
+        grad_var_sigma=-dim*np.power(sigma_est,-1)
         
-        e0=np.matrix(e[:,m,0]).T
-        e1=np.matrix(e[:,m,1]).T
-        e2=np.matrix(e[:,m,2]).T
-        e3=np.matrix(e[:,m,3]).T
-        e4=np.matrix(e[:,m,4]).T
-        e5=np.matrix(e[:,m,5]).T
         
         #Compute gradients from prior
         gp1,sp1,gk1,sk1,gk2,sk2=grad.prior_gradient_mu(alpha0,sigma0,e0,alpha2,sigma2,e2,alpha3,sigma3,e3,mu_prior,Cov_prior)
@@ -304,10 +290,5 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
     if count==6:
         break
 
-with open('objs.pkl', 'wb') as f:  # Python 3: open(..., 'wb')
-    pickle.dump([alpha_est,sigma_est], f)
-f.close()
 
-np.save('alpha_est',all_alpha_est)
-np.save('sigma_est',all_sigma_est)
 
