@@ -45,11 +45,15 @@ true_mu=true_mu.ravel()
 true_mu=true_mu.reshape(2,6)
 Q=np.matrix(0.5*np.eye(dim))
 
-M=1 #Number of samples drawn from N(0,I) at each iteration
+
+
+
+
+M=3 #Number of samples drawn from N(0,I) at each iteration
 max_iter=1000 #Maximum number of iterations SGVB will run for 
 
 #Parameters of ADAM
-a=0.1
+a=0.08
 beta1=0.9
 beta2=0.999
 
@@ -61,6 +65,23 @@ NumParents=2 #Number of parents
 NumKids=4 #Number of kids
 PerParent=int(NumKids/NumParents) #Each parents will have equal number of children
 NumFam=NumParents #Number of families
+
+
+#Extract LDS that corresponds to Parents
+theta_p=theta[:,:,0:NumParents]
+theta_k=theta[:,:,NumParents:NumParents+NumKids]
+
+IC_p=Cov[:,:,0:NumParents]
+IC_k=Cov[:,:,NumParents:NumParents+NumKids]
+
+for p in range(0,NumParents):
+    IC_p[:,:,p]=np.matrix(IC_p[:,:,p]).I
+for k in range(0,NumKids):
+    IC_k[:,:,k]=np.matrix(IC_k[:,:,k]).I
+
+IQ=np.matrix(Q).I
+
+
 """
 alpha and theta will follow this convention
 [P1, Kids of P1, P2 kids of P2, etc ]
@@ -70,15 +91,7 @@ alpha_est=np.random.multivariate_normal(mu_prior,Cov_prior,NumParents).T
 beta_est=np.random.multivariate_normal(mu_prior,0.5*np.eye(dim),NumKids).T
 sigma_est=np.sqrt(10)*np.ones(NumParents)
 nu_est=np.sqrt(10)*np.ones(NumKids)
-##Create a matrix that holds families. 
-#fam_alpha=np.zeros((dim,1+PerParent,NumFam))
-#
-#point=0 #Use to keep track of position for the for loop below
-#for p in range(0,NumParents):
-#    fam_alpha[:,0,p]=alpha_est[:,p]
-#    fam_alpha[:,1:1+PerParent,p]=beta_est[:,point:point+PerParent]
-#    point+=PerParent
-#fam_sigma=np.reshape(sigma_est,(NumFam,PerParent+1))    
+   
 
 #ADAM parameters for alpha 
 m_alpha=np.zeros((dim,NumParents))
@@ -89,12 +102,12 @@ m_beta=np.zeros((dim,NumKids))
 v_beta=np.zeros((dim,NumKids))
 
 #ADAM parameters for sigma
-m_sigma=np.zeros((dim,NumParents))
-v_sigma=np.zeros((dim,NumParents))
+m_sigma=np.zeros((NumParents))
+v_sigma=np.zeros((NumParents))
 
 #ADAM parameters for nu
-m_nu=np.zeros((dim,NumKids))
-v_nu=np.zeros((dim,NumKids))
+m_nu=np.zeros((NumKids))
+v_nu=np.zeros((NumKids))
 
 iter=0
 while iter<max_iter: # TODO: write this as a for loop! (you can break)
@@ -107,8 +120,8 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
     #Initalize matrix to store gradients of alpha,beta, sigma
     gradients_alpha=np.zeros((dim,NumParents,M))
     gradients_beta=np.zeros((dim,NumKids,M))
-    gradients_sigma=np.zeros(NumParents)
-    gradients_nu=np.zeros(NumKids)
+    gradients_sigma=np.zeros((M,NumParents))
+    gradients_nu=np.zeros((M,NumKids))
     
     for m in range(0,M):
         
@@ -133,173 +146,98 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
         
         for k in range(0,NumKids):
             grad_prior_nu[k]=np.array(-nu_est[k]*np.matrix(e_k[:,k,m])*np.matrix(Cov_k).I*np.matrix(e_k[:,k,m]).T).ravel()
-                
-
         
-        like_a0=0
-        like_a1=0
-        like_a2=0
-        like_a3=0
-        like_a4=0
-        like_a5=0
+        #Take gradient of likelihood
+        grad_like_alpha=np.zeros((dim,NumParents))
+        grad_like_sigma=np.zeros((1,NumParents))
+        grad_like_beta=np.zeros((dim,NumKids))
+        grad_like_nu=np.zeros((1,NumKids))
         
-        like_s0=0
-        like_s1=0
-        like_s2=0
-        like_s3=0
-        like_s4=0
-        like_s5=0
         
-        for t in range(0,T-1):
+        for t in range(0,2001):
             x_prev=np.matrix(states[:,t])
             x_curr=np.matrix(states[:,t+1])
             u=x_prev
             u=np.concatenate((u,[[1]]),axis=0)
             #Compute gradients from Likelihood
-            la1,la2,la3,la4,la5,la6,ls1,ls2,ls3,ls4,ls5,ls6=grad.like_gradient(alpha0,alpha1,alpha2,alpha3,alpha4,alpha5,sigma0,sigma1,sigma2,sigma3,sigma4,sigma5,e0,e1,e2,e3,e4,e5,x_prev,u,x_curr,Cov,theta,Q)
-            like_a0+=la1
-            like_a1+=la2
-            like_a2+=la3
-            like_a3+=la4
-            like_a4+=la5
-            like_a5+=la6
-            
-            like_s0+=ls1
-            like_s1+=ls2
-            like_s2+=ls3
-            like_s3+=ls4
-            like_s4+=ls5
-            like_s5+=ls6
+            alpha_grad,beta_grad, sigma_grad, nu_grad=grad.like_gradient_mu(dim,alpha_est,beta_est,sigma_est,nu_est,e_p[:,:,m],\
+                                                                        e_k[:,:,m],IC_p,IC_k,theta_p,theta_k,x_prev,\
+                                                                        x_curr,u,IQ,NumParents,NumKids,PerParent)
         
-        gradients_alpha1.append(like_a0+gp1-var_a_p1)
-        gradients_alpha2.append(like_a1+gp2-var_a_p2)
-        gradients_alpha3.append(like_a2+gk1-var_a_k1)
-        gradients_alpha4.append(like_a3+gk2-var_a_k2)
-        gradients_alpha5.append(like_a4+gk3-var_a_k3)
-        gradients_alpha6.append(like_a5+gk4-var_a_k4)
-                            
-        gradients_s1.append(like_s0+sp1-var_s_p1)
-        gradients_s2.append(like_s1+sp2-var_s_p2)
-        gradients_s3.append(like_s2+sk1-var_s_k1)
-        gradients_s4.append(like_s3+sk2-var_s_k2)
-        gradients_s5.append(like_s4+sk3-var_s_k3)
-        gradients_s6.append(like_s5+sk4-var_s_k4)
+            grad_like_alpha+=np.matrix(alpha_grad.numpy())
+            grad_like_sigma+=np.matrix(sigma_grad.numpy())
+            grad_like_beta+=np.matrix(beta_grad.numpy())
+            grad_like_nu+=np.matrix(nu_grad.numpy())
         
-       
+        
+        #Samples from gradient of ELBO
+        gradients_alpha[:,:,m]=grad_like_alpha+grad_prior_alpha
+        gradients_sigma[m,:]=grad_like_sigma+grad_prior_sigma-grad_var_sigma
+        gradients_beta[:,:,m]=grad_like_beta
+        gradients_nu[m,:]=grad_like_nu+grad_prior_nu-grad_var_nu
         
     
-    gradient_alpha=[]
-    #########################################
-    temp=0
-    for g in gradients_alpha1:
-        temp+=g/M
-    gradient_alpha.append(np.matrix(temp))
+    gradient_alpha=np.mean(gradients_alpha,axis=2)
+    gradient_sigma=np.mean(gradients_sigma,axis=0)
+    gradient_beta=np.mean(gradients_beta,axis=2)
+    gradient_nu=np.mean(gradients_nu,axis=0)
     
-    #########################################
-    temp=0
-    for g in gradients_alpha2:
-        temp+=g/M
-    gradient_alpha.append(np.matrix(temp))
     
-    #########################################
-    temp=0
-    for g in gradients_alpha3:
-        temp+=g/M
-    gradient_alpha.append(np.matrix(temp))
-    
-    #########################################
-    temp=0
-    for g in gradients_alpha4:
-        temp+=g/M
-    gradient_alpha.append(np.matrix(temp))
-    
-    #########################################
-    temp=0
-    for g in gradients_alpha5:
-        temp+=g/M
-    gradient_alpha.append(np.matrix(temp))
-    
-    #########################################
-    temp=0
-    for g in gradients_alpha6:
-        temp+=g/M
-    gradient_alpha.append(np.matrix(temp))
-  ###################################################################
-#####################################################################  
-    
-    gradient_s=[]
-    #########################################
-    temp=0
-    for g in gradients_s1:
-        temp+=g/M
-    gradient_s.append(np.matrix(temp))
-    
-    #########################################
-    temp=0
-    for g in gradients_s2:
-        temp+=g/M
-    gradient_s.append(np.matrix(temp))
-    
-    #########################################
-    temp=0
-    for g in gradients_s3:
-        temp+=g/M
-    gradient_s.append(np.matrix(temp))
-    
-    #########################################
-    temp=0
-    for g in gradients_s4:
-        temp+=g/M
-    gradient_s.append(np.matrix(temp))
-    
-    #########################################
-    temp=0
-    for g in gradients_s5:
-        temp+=g/M
-    gradient_s.append(np.matrix(temp))
-    
-    #########################################
-    temp=0
-    for g in gradients_s6:
-        temp+=g/M
-    gradient_s.append(np.matrix(temp))
-    ###################################################################
-#####################################################################  
-      
-    gradient_alpha=np.matrix(np.asarray(gradient_alpha)).T
-    print(gradient_alpha)
-    gradient_s=np.matrix(np.asarray(gradient_s))
     
     m_alpha=beta1*m_alpha+(1-beta1)*gradient_alpha
     m_alpha_hat=m_alpha/(1-beta1**iter)
     v_alpha=beta2*v_alpha+(1-beta2)*np.power(gradient_alpha,2)
     v_alpha_hat=v_alpha/(1-beta2**iter)
     
-    m_sigma=beta1*m_sigma+(1-beta1)*gradient_s
+    m_sigma=beta1*m_sigma+(1-beta1)*gradient_sigma
     m_sigma_hat=m_sigma/(1-beta1**iter)
-    v_sigma=beta2*v_sigma+(1-beta2)*np.power(gradient_s,2)
-    v_s_hat=v_sigma/(1-beta2**iter)
+    v_sigma=beta2*v_sigma+(1-beta2)*np.power(gradient_sigma,2)
+    v_sigma_hat=v_sigma/(1-beta2**iter)
+    
+    m_beta=beta1*m_beta+(1-beta1)*gradient_beta
+    m_beta_hat=m_beta/(1-beta1**iter)
+    v_beta=beta2*v_beta+(1-beta2)*np.power(gradient_beta,2)
+    v_beta_hat=v_beta/(1-beta2**iter)
+    
+    m_nu=beta1*m_nu+(1-beta1)*gradient_nu
+    m_nu_hat=m_nu/(1-beta1**iter)
+    v_nu=beta2*v_nu+(1-beta2)*np.power(gradient_nu,2)
+    v_nu_hat=v_nu/(1-beta2**iter)
+    
+    
     
     alpha_past=alpha_est
+    sigma_past=sigma_est
+    beta_past=beta_est
+    nu_past=nu_est
     
-    alpha_est=alpha_est+a*np.divide(m_alpha_hat,np.sqrt(v_alpha_hat)+1e-8)
-    sigma_est=sigma_est+a*np.divide(m_sigma_hat,np.sqrt(v_s_hat)+1e-8)
+    alpha_est=alpha_past+a*np.divide(m_alpha_hat,np.sqrt(v_alpha_hat)+1e-8)
+    sigma_est=sigma_past+a*np.divide(m_sigma_hat,np.sqrt(v_sigma_hat)+1e-8)
+    beta_est=beta_past+a*np.divide(m_beta_hat,np.sqrt(v_beta_hat)+1e-8)
+    nu_est=nu_past+a*np.divide(m_nu_hat,np.sqrt(v_nu_hat)+1e-8)
     
-    print(sigma_est)
     print(alpha_est)
-    
-    all_alpha_est[:,:,iter]=alpha_est
-    all_sigma_est[iter,:]=sigma_est
+    print(beta_est)
+
     
     count=0
-    for n in range(0,6):
+    for n in range(0,NumParents):
         diff=alpha_est[:,n]-alpha_past[:,n]
         dist=np.sqrt(diff.T*diff)
-        if dist<=0.1:
+        if dist<=0.07:
+            count+=1
+    
+    for n in range(0,NumKids):
+        diff=beta_est[:,n]-beta_past[:,n]
+        dist=np.sqrt(diff.T*diff)
+        if dist<=0.07:
             count+=1
     
     if count==6:
         break
+    
+np.save(alpha_est,'alpha_parents')
+np.save(beta_est,'beta_kids')
 
 
 
