@@ -15,14 +15,12 @@ mu_k|mu_p~N(mu_k+beta_p,s_k^2*I) where beta_p is an offset. projection will also
 be done on s_k
 So we will learn alpha_p's and 
 """
-
 import torch
 from torch import FloatTensor
 from torch.autograd import Variable
 import numpy as np
 import scipy.io as sio
 import gradients as grad
-import pickle
 
 #Load in synthetic states from matlab
 mat_contents=sio.loadmat('synthetic_states.mat')
@@ -58,11 +56,11 @@ beta2=0.999
 #Set up prior for parents
 mu_prior=np.zeros(dim)
 Cov_prior=10*np.eye(dim)
-
+Cov_k=2*np.eye(dim) #Covariance matrix for prior N(mu_k|mu_p)
 NumParents=2 #Number of parents
 NumKids=4 #Number of kids
 PerParent=int(NumKids/NumParents) #Each parents will have equal number of children
-NumFam=int((NumParents+NumKids)/PerParent) #Number of families
+NumFam=NumParents #Number of families
 """
 alpha and theta will follow this convention
 [P1, Kids of P1, P2 kids of P2, etc ]
@@ -70,15 +68,17 @@ alpha and theta will follow this convention
 #Beta is also encoded in this array
 alpha_est=np.random.multivariate_normal(mu_prior,Cov_prior,NumParents).T
 beta_est=np.random.multivariate_normal(mu_prior,0.5*np.eye(dim),NumKids).T
-sigma_est=np.sqrt(4)*np.ones(NumParents+NumKids)
-
-#Create a matrix that holds families. 
-fam=np.zeros((dim,1+PerParent,NumFam))
-point=0
-for p in range(0,NumParents):
-    fam[:,0,p]=alpha_est[:,p]
-    fam[:,1:1+PerParent,p]=beta_est[:,point:point+PerParent]
-    point+=PerParent
+sigma_est=np.sqrt(10)*np.ones(NumParents)
+nu_est=np.sqrt(10)*np.ones(NumKids)
+##Create a matrix that holds families. 
+#fam_alpha=np.zeros((dim,1+PerParent,NumFam))
+#
+#point=0 #Use to keep track of position for the for loop below
+#for p in range(0,NumParents):
+#    fam_alpha[:,0,p]=alpha_est[:,p]
+#    fam_alpha[:,1:1+PerParent,p]=beta_est[:,point:point+PerParent]
+#    point+=PerParent
+#fam_sigma=np.reshape(sigma_est,(NumFam,PerParent+1))    
 
 #ADAM parameters for alpha 
 m_alpha=np.zeros((dim,NumParents))
@@ -89,9 +89,12 @@ m_beta=np.zeros((dim,NumKids))
 v_beta=np.zeros((dim,NumKids))
 
 #ADAM parameters for sigma
-m_sigma=np.zeros((dim,NumParents+NumKids))
-v_sigma=np.zeros((dim,NumParents+NumKids))
+m_sigma=np.zeros((dim,NumParents))
+v_sigma=np.zeros((dim,NumParents))
 
+#ADAM parameters for nu
+m_nu=np.zeros((dim,NumKids))
+v_nu=np.zeros((dim,NumKids))
 
 iter=0
 while iter<max_iter: # TODO: write this as a for loop! (you can break)
@@ -104,26 +107,34 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
     #Initalize matrix to store gradients of alpha,beta, sigma
     gradients_alpha=np.zeros((dim,NumParents,M))
     gradients_beta=np.zeros((dim,NumKids,M))
-    gradients_sigma=np.zeros(NumParents+NumKids)
+    gradients_sigma=np.zeros(NumParents)
+    gradients_nu=np.zeros(NumKids)
     
     for m in range(0,M):
         
-        #Compute gradients wrt to variational distribution
+        #Compute gradients of variational distribution
         #(NOTE: Variational distribution gives gradient 0 for alpha and beta)
         grad_var_sigma=-dim*np.power(sigma_est,-1)
+        grad_var_nu=-dim*np.power(nu_est,-1)
         
         
-        #Compute gradients from prior
-        gp1,sp1,gk1,sk1,gk2,sk2=grad.prior_gradient_mu(alpha0,sigma0,e0,alpha2,sigma2,e2,alpha3,sigma3,e3,mu_prior,Cov_prior)
-        gp2,sp2,gk3,sk3,gk4,sk4=grad.prior_gradient_mu(alpha1,sigma1,e1,alpha4,sigma4,e4,alpha5,sigma5,e5,mu_prior,Cov_prior)
+        #Compute gradients of prior distribution
+        grad_prior_alpha=np.zeros((dim,NumParents))
+        grad_prior_sigma=np.zeros(NumParents)
+        grad_prior_nu=np.zeros(NumKids)
+        point=0 #Used to keep track of location in matrix
+        for p in range(0,NumParents):
+            #NOTE: The prior distribution only gives non-zero gradients to location parameters 
+            #of parents
+            grad_prior_alpha[:,p]=np.array(-0.5*np.matrix(Cov_prior).I*np.matrix(alpha_est[:,p]\
+                            +sigma_est[point]*e_p[:,p,m]-mu_prior).T).ravel()
+            grad_prior_sigma[point]=np.array(np.matrix(grad_prior_alpha[:,p])*\
+                            np.matrix(e_p[:,p,m]).T).ravel()
         
-        #Compute gradients from variational distribution
-        var_a_p1,var_s_p1=grad.variational_gradient_mu(alpha0,sigma0,e0,dim)
-        var_a_p2,var_s_p2=grad.variational_gradient_mu(alpha1,sigma1,e1,dim)
-        var_a_k1,var_s_k1=grad.variational_gradient_mu(alpha2,sigma2,e2,dim)
-        var_a_k2,var_s_k2=grad.variational_gradient_mu(alpha3,sigma3,e3,dim)
-        var_a_k3,var_s_k3=grad.variational_gradient_mu(alpha4,sigma4,e4,dim)
-        var_a_k4,var_s_k4=grad.variational_gradient_mu(alpha5,sigma5,e5,dim)
+        for k in range(0,NumKids):
+            grad_prior_nu[k]=np.array(-nu_est[k]*np.matrix(e_k[:,k,m])*np.matrix(Cov_k).I*np.matrix(e_k[:,k,m]).T).ravel()
+                
+
         
         like_a0=0
         like_a1=0
