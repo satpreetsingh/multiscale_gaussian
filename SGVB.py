@@ -25,7 +25,7 @@ import gradients as grad
 #Load in synthetic states from matlab
 mat_contents=sio.loadmat('synthetic_states.mat')
 states=np.matrix(mat_contents['x'])
-states=states[:,0:1000]
+states=states[:,0:2000]
 T=states[1,:].size #Number of data points
 dim=states[:,1].size #Dimension of latent state
 
@@ -154,7 +154,7 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
         grad_like_nu=np.zeros((1,NumKids))
         
         
-        for t in range(0,2001):
+        for t in range(0,T-1):
             x_prev=np.matrix(states[:,t])
             x_curr=np.matrix(states[:,t+1])
             u=x_prev
@@ -222,13 +222,13 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
     
     count=0
     for n in range(0,NumParents):
-        diff=alpha_est[:,n]-alpha_past[:,n]
+        diff=np.matrix(alpha_est[:,n]-alpha_past[:,n]).T
         dist=np.sqrt(diff.T*diff)
         if dist<=0.07:
             count+=1
     
     for n in range(0,NumKids):
-        diff=beta_est[:,n]-beta_past[:,n]
+        diff=np.matrix(beta_est[:,n]-beta_past[:,n]).T
         dist=np.sqrt(diff.T*diff)
         if dist<=0.07:
             count+=1
