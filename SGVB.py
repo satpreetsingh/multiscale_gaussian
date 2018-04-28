@@ -42,7 +42,7 @@ mat_contents=sio.loadmat('mu.mat')
 true_mu=mat_contents['mu']
 true_mu=true_mu.ravel()
 true_mu=true_mu.reshape(2,6)
-Q=np.matrix(1e-4*np.eye(dim))
+Q=np.matrix(.05*.05*np.eye(dim))
 
 
 
@@ -52,14 +52,14 @@ M=3 #Number of samples drawn from N(0,I) at each iteration
 max_iter=1000 #Maximum number of iterations SGVB will run for 
 
 #Parameters of ADAM
-a=0.08
+a=0.1
 beta1=0.9
 beta2=0.999
 
 #Set up prior for parents
 mu_prior=np.zeros(dim)
 Cov_prior=10*np.eye(dim)
-Cov_k=2*np.eye(dim) #Covariance matrix for prior N(mu_k|mu_p)
+Cov_k=np.eye(dim) #Covariance matrix for prior N(mu_k|mu_p)
 NumParents=2 #Number of parents
 NumKids=4 #Number of kids
 PerParent=int(NumKids/NumParents) #Each parents will have equal number of children
@@ -86,7 +86,8 @@ alpha and theta will follow this convention
 [P1, Kids of P1, P2 kids of P2, etc ]
 """
 #Beta is also encoded in this array
-alpha_est=np.random.multivariate_normal(mu_prior,Cov_prior,NumParents).T
+#alpha_est=np.random.multivariate_normal(mu_prior,Cov_prior,NumParents).T
+alpha_est=np.array([[-2,2],[-2,2]])
 beta_est=np.random.multivariate_normal(mu_prior,0.5*np.eye(dim),NumKids).T
 sigma_est=np.sqrt(10)*np.ones(NumParents)
 nu_est=np.sqrt(10)*np.ones(NumKids)
@@ -223,16 +224,30 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
     for n in range(0,NumParents):
         diff=np.matrix(alpha_est[:,n]-alpha_past[:,n]).T
         dist=np.sqrt(diff.T*diff)
-        if dist<=0.01:
+        if dist<=0.08:
+            count+=1
+    
+    for n in range(0,NumParents):
+        diff=np.matrix(sigma_est[n]-sigma_past[n]).T
+        dist=np.sqrt(diff.T*diff)
+        if dist<=0.08:
             count+=1
     
     for n in range(0,NumKids):
         diff=np.matrix(beta_est[:,n]-beta_past[:,n]).T
         dist=np.sqrt(diff.T*diff)
-        if dist<=0.01:
+        if dist<=0.08:
             count+=1
     
-    if count==6:
+    for n in range(0,NumKids):
+        diff=np.matrix(nu_est[:,n]-nu_past[:,n]).T
+        dist=np.sqrt(diff.T*diff)
+        if dist<=0.08:
+            count+=1
+    
+    
+    
+    if count==12:
         break
     
 np.save('alpha_parents',alpha_est)
