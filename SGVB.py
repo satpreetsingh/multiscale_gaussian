@@ -25,7 +25,6 @@ import gradients as grad
 #Load in synthetic states from matlab
 mat_contents=sio.loadmat('synthetic_states.mat')
 states=np.matrix(mat_contents['x'])
-states=states[:,0:2000]
 T=states[1,:].size #Number of data points
 dim=states[:,1].size #Dimension of latent state
 
@@ -43,7 +42,7 @@ mat_contents=sio.loadmat('mu.mat')
 true_mu=mat_contents['mu']
 true_mu=true_mu.ravel()
 true_mu=true_mu.reshape(2,6)
-Q=np.matrix(0.5*np.eye(dim))
+Q=np.matrix(1e-4*np.eye(dim))
 
 
 
@@ -224,20 +223,20 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
     for n in range(0,NumParents):
         diff=np.matrix(alpha_est[:,n]-alpha_past[:,n]).T
         dist=np.sqrt(diff.T*diff)
-        if dist<=0.07:
+        if dist<=0.01:
             count+=1
     
     for n in range(0,NumKids):
         diff=np.matrix(beta_est[:,n]-beta_past[:,n]).T
         dist=np.sqrt(diff.T*diff)
-        if dist<=0.07:
+        if dist<=0.01:
             count+=1
     
     if count==6:
         break
     
-np.save(alpha_est,'alpha_parents')
-np.save(beta_est,'beta_kids')
+np.save('alpha_parents',alpha_est)
+np.save('beta_kids',beta_est)
 
 
 
