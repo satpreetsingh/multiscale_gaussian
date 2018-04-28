@@ -15,9 +15,6 @@ mu_k|mu_p~N(mu_k+beta_p,s_k^2*I) where beta_p is an offset. projection will also
 be done on s_k
 So we will learn alpha_p's and 
 """
-import torch
-from torch import FloatTensor
-from torch.autograd import Variable
 import numpy as np
 import scipy.io as sio
 import gradients as grad
@@ -42,7 +39,7 @@ mat_contents=sio.loadmat('mu.mat')
 true_mu=mat_contents['mu']
 true_mu=true_mu.ravel()
 true_mu=true_mu.reshape(2,6)
-Q=np.matrix(.05*.05*np.eye(dim))
+Q=np.matrix(.01*np.eye(dim))
 
 
 
@@ -52,14 +49,14 @@ M=3 #Number of samples drawn from N(0,I) at each iteration
 max_iter=1000 #Maximum number of iterations SGVB will run for 
 
 #Parameters of ADAM
-a=0.1
+a=0.09
 beta1=0.9
 beta2=0.999
 
 #Set up prior for parents
 mu_prior=np.zeros(dim)
 Cov_prior=10*np.eye(dim)
-Cov_k=np.eye(dim) #Covariance matrix for prior N(mu_k|mu_p)
+Cov_k=3*np.eye(dim) #Covariance matrix for prior N(mu_k|mu_p)
 NumParents=2 #Number of parents
 NumKids=4 #Number of kids
 PerParent=int(NumKids/NumParents) #Each parents will have equal number of children
@@ -78,7 +75,7 @@ for p in range(0,NumParents):
 for k in range(0,NumKids):
     IC_k[:,:,k]=np.matrix(IC_k[:,:,k]).I
 
-IQ=np.matrix(Q).I
+IQ=np.matrix(np.eye(dim)/.01)
 
 
 """
@@ -87,10 +84,10 @@ alpha and theta will follow this convention
 """
 #Beta is also encoded in this array
 #alpha_est=np.random.multivariate_normal(mu_prior,Cov_prior,NumParents).T
-alpha_est=np.array([[-2,2],[-2,2]])
-beta_est=np.random.multivariate_normal(mu_prior,0.5*np.eye(dim),NumKids).T
+alpha_est=np.array([[-5,5],[-5,5]])
+beta_est=np.random.multivariate_normal(mu_prior,2*np.eye(dim),NumKids).T
 sigma_est=np.sqrt(10)*np.ones(NumParents)
-nu_est=np.sqrt(10)*np.ones(NumKids)
+nu_est=np.sqrt(3)*np.ones(NumKids)
    
 
 #ADAM parameters for alpha 
@@ -130,7 +127,6 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
         grad_var_sigma=-dim*np.power(sigma_est,-1)
         grad_var_nu=-dim*np.power(nu_est,-1)
         
-        
         #Compute gradients of prior distribution
         grad_prior_alpha=np.zeros((dim,NumParents))
         grad_prior_sigma=np.zeros(NumParents)
@@ -144,6 +140,7 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
             grad_prior_sigma[point]=np.array(np.matrix(grad_prior_alpha[:,p])*\
                             np.matrix(e_p[:,p,m]).T).ravel()
         
+
         for k in range(0,NumKids):
             grad_prior_nu[k]=np.array(-nu_est[k]*np.matrix(e_k[:,k,m])*np.matrix(Cov_k).I*np.matrix(e_k[:,k,m]).T).ravel()
         
@@ -152,7 +149,6 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
         grad_like_sigma=np.zeros((1,NumParents))
         grad_like_beta=np.zeros((dim,NumKids))
         grad_like_nu=np.zeros((1,NumKids))
-        
         
         for t in range(0,T-1):
             x_prev=np.matrix(states[:,t])
@@ -164,17 +160,17 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
                                                                         e_k[:,:,m],IC_p,IC_k,theta_p,theta_k,x_prev,\
                                                                         x_curr,u,IQ,NumParents,NumKids,PerParent)
         
-            grad_like_alpha+=np.matrix(alpha_grad.numpy())
-            grad_like_sigma+=np.matrix(sigma_grad.numpy())
-            grad_like_beta+=np.matrix(beta_grad.numpy())
-            grad_like_nu+=np.matrix(nu_grad.numpy())
+            grad_like_alpha+=np.matrix(alpha_grad.numpy())+1e-8
+            grad_like_sigma+=np.matrix(sigma_grad.numpy())+1e-8
+            grad_like_beta+=np.matrix(beta_grad.numpy())+1e-8
+            grad_like_nu+=np.matrix(nu_grad.numpy())+1e-8
         
-        
+
         #Samples from gradient of ELBO
-        gradients_alpha[:,:,m]=grad_like_alpha+grad_prior_alpha
-        gradients_sigma[m,:]=grad_like_sigma+grad_prior_sigma-grad_var_sigma
-        gradients_beta[:,:,m]=grad_like_beta
-        gradients_nu[m,:]=grad_like_nu+grad_prior_nu-grad_var_nu
+        gradients_alpha[:,:,m]=grad_like_alpha+grad_prior_alpha+1e-8
+        gradients_sigma[m,:]=grad_like_sigma+grad_prior_sigma-grad_var_sigma+1e-8
+        gradients_beta[:,:,m]=grad_like_beta+1e-8
+        gradients_nu[m,:]=grad_like_nu+grad_prior_nu-grad_var_nu+1e-8
         
     
     gradient_alpha=np.mean(gradients_alpha,axis=2)
@@ -240,7 +236,7 @@ while iter<max_iter: # TODO: write this as a for loop! (you can break)
             count+=1
     
     for n in range(0,NumKids):
-        diff=np.matrix(nu_est[:,n]-nu_past[:,n]).T
+        diff=np.matrix(nu_est[n]-nu_past[n]).T
         dist=np.sqrt(diff.T*diff)
         if dist<=0.08:
             count+=1
