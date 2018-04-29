@@ -13,7 +13,7 @@ to taking the absolute value i.e. s_t=abs(s_+eta*g)
 The kids will be conditioned on the parents
 mu_k|mu_p~N(mu_k+beta_p,s_k^2*I) where beta_p is an offset. projection will also 
 be done on s_k
-So we will learn alpha_p's and 
+So we will learn alpha_p's, beta_j's and s's
 """
 import numpy as np
 import scipy.io as sio
