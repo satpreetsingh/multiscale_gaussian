@@ -100,13 +100,13 @@ def like_gradient_cov(dim,lambda_p,lambda_k,e_p,e_k,mu_p,mu_k,LDS_p,LDS_k,x_prev
 
     #Weigh Clusters
     for p in range(0,NumParents):
-        weights_parents[p,0]=torch.exp(torch.matmul(-0.5*(x_p[:,0]-mp[:,p]).unsqueeze(0),(x_p[:,0]-mp[:,p]))/torch.pow(-ep[:,p]*torch.log(1+1e-2+torch.exp(lp[:,p])),2 )  )+1e-30
-        x_temp_parents[:,p]=(torch.exp(torch.matmul(-0.5*(x_p[:,0]-mp[:,p]).unsqueeze(0),(x_p[:,0]-mp[:,p]))/torch.pow(-ep[:,p]*torch.log(1+1e-2+torch.exp(lp[:,p])),2 )  )+1e-30)*torch.matmul(Theta_p[:,:,p],u)
+        weights_parents[p,0]=torch.exp(torch.matmul(-0.5*(x_p[:,0]-mp[:,p]).unsqueeze(0),(x_p[:,0]-mp[:,p]))/(-ep[:,p]*torch.log(1+torch.exp(lp[:,p])))  )+1e-50
+        x_temp_parents[:,p]=(torch.exp(torch.matmul(-0.5*(x_p[:,0]-mp[:,p]).unsqueeze(0),(x_p[:,0]-mp[:,p]))/(-ep[:,p]*torch.log(1+torch.exp(lp[:,p])))  )+1e-50)*torch.matmul(Theta_p[:,:,p],u)
         
     for k in range(0,NumKids):
         p=int(k/PerParent)
-        weights_kids[k,0]=torch.exp(torch.matmul(-0.5*(x_p[:,0]-mk[:,k]).unsqueeze(0),(x_p[:,0]-mk[:,k]))/torch.pow(-ek[:,k]*torch.log(1+1e-2+torch.exp(lk[:,k])),2 )  )+1e-30
-        x_temp_kids[:,k]=(torch.exp(torch.matmul(-0.5*(x_p[:,0]-mk[:,k]).unsqueeze(0),(x_p[:,0]-mk[:,k]))/torch.pow(-ek[:,k]*torch.log(1+1e-2+torch.exp(lk[:,k])),2 )  )+1e-30)*torch.matmul(Theta_k[:,:,k],u)
+        weights_kids[k,0]=torch.exp(torch.matmul(-0.5*(x_p[:,0]-mk[:,k]).unsqueeze(0),(x_p[:,0]-mk[:,k]))/(-ek[:,k]*torch.log(1+torch.exp(lk[:,k])))  )+1e-50
+        x_temp_kids[:,k]=(torch.exp(torch.matmul(-0.5*(x_p[:,0]-mk[:,k]).unsqueeze(0),(x_p[:,0]-mk[:,k]))/(-ek[:,k]*torch.log(1+torch.exp(lk[:,k])) )  )+1e-50)*torch.matmul(Theta_k[:,:,k],u)
     
 
     #Normalize
