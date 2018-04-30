@@ -71,4 +71,57 @@ def like_gradient_mu(dim,alpha,beta,sigma,nu,e_p,e_k,Inv_Cov_p,Inv_Cov_k,LDS_p,L
     return a.grad.data,b.grad.data,s.grad.data,n.grad.data
     
     
+def like_gradient_cov(dim,lambda_p,lambda_k,e_p,e_k,mu_p,mu_k,LDS_p,LDS_k,x_prev,x_curr,u_prev,IQ,NumParents,NumKids,PerParent):
     
+    #Variables we don't need gradient of 
+    mp=Variable(torch.from_numpy(mu_p).float()) #Covariance matrices of parents
+    mk=Variable(torch.from_numpy(mu_k).float()) #Covariance matrices of kids
+    Theta_p=Variable(torch.from_numpy(LDS_p).float()) #LDS of parents
+    Theta_k=Variable(torch.from_numpy(LDS_k).float()) #LDS of kids
+    IQ=Variable(torch.from_numpy(IQ).float()) #Covariance matrix of state noise
+    x_p=Variable(torch.from_numpy(x_prev).float()) #x_{t-1}
+    x_c=Variable(torch.from_numpy(x_curr).float()) #x_t
+    u=Variable(torch.from_numpy(u_prev).float()) #u=[x_{t-1};1]
+    ep=Variable(torch.from_numpy(np.matrix(e_p)).float())
+    ek=Variable(torch.from_numpy(np.matrix(e_k)).float())
+    
+    #Variables that we do need the gradients of 
+    lp=Variable(torch.from_numpy(np.matrix(lambda_p)).float(),requires_grad=True)
+    lp.retain_grad()
+    lk=Variable(torch.from_numpy(np.matrix(lambda_k)).float(),requires_grad=True)
+    lk.retain_grad()
+    
+    #Used to store weights
+    weights_parents=Variable(torch.from_numpy(np.matrix(np.zeros(NumParents)).T).float())
+    weights_kids=Variable(torch.from_numpy(np.matrix(np.zeros(NumKids)).T).float())
+    x_temp_parents=Variable(torch.from_numpy(np.matrix(np.zeros((dim,NumParents)))).float())
+    x_temp_kids=Variable(torch.from_numpy(np.matrix(np.zeros((dim,NumKids)))).float())
+    
+
+    #Weigh Clusters
+    for p in range(0,NumParents):
+        weights_parents[p,0]=torch.exp(torch.matmul(-0.5*(x_p[:,0]-mp[:,p]).unsqueeze(0),(x_p[:,0]-mp[:,p]))/torch.pow(-ep[:,p]*torch.log(1+1e-2+torch.exp(lp[:,p])),2 )  )+1e-30
+        x_temp_parents[:,p]=(torch.exp(torch.matmul(-0.5*(x_p[:,0]-mp[:,p]).unsqueeze(0),(x_p[:,0]-mp[:,p]))/torch.pow(-ep[:,p]*torch.log(1+1e-2+torch.exp(lp[:,p])),2 )  )+1e-30)*torch.matmul(Theta_p[:,:,p],u)
+        
+    for k in range(0,NumKids):
+        p=int(k/PerParent)
+        weights_kids[k,0]=torch.exp(torch.matmul(-0.5*(x_p[:,0]-mk[:,k]).unsqueeze(0),(x_p[:,0]-mk[:,k]))/torch.pow(-ek[:,k]*torch.log(1+1e-2+torch.exp(lk[:,k])),2 )  )+1e-30
+        x_temp_kids[:,k]=(torch.exp(torch.matmul(-0.5*(x_p[:,0]-mk[:,k]).unsqueeze(0),(x_p[:,0]-mk[:,k]))/torch.pow(-ek[:,k]*torch.log(1+1e-2+torch.exp(lk[:,k])),2 )  )+1e-30)*torch.matmul(Theta_k[:,:,k],u)
+    
+
+    #Normalize
+    Z=torch.sum(weights_parents)+torch.sum(weights_kids)
+    
+    x_p_clone=x_temp_parents.clone()
+    x_k_clone=x_temp_kids.clone()
+    x_unnorm=torch.sum(x_p_clone,1)+torch.sum(x_k_clone.clone(),1)
+    x_norm=x_unnorm.clone()/Z
+    
+    y=x_norm.clone().unsqueeze(1)
+    z=x_c-y
+    F=torch.matmul(torch.matmul((z).transpose(0,1),IQ),(z))
+    
+    L=-0.5*F
+
+    L.backward()
+    return lp.grad.data,lk.grad.data
